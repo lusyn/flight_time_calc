@@ -68,6 +68,7 @@ function msToTime(ms: number) {
 const App: React.FC = () => {
     const [form] = Form.useForm();
     const [isError, setIsError] = useState(true);
+    const [errorMsg, setErrorMsg] = useState('');
     const [lastWorkTime, setLastWorkTime] = useState<string>('');
     const [planWorkTime, setPlanWorkTime] = useState<string>('');
 
@@ -104,21 +105,38 @@ const App: React.FC = () => {
         const thirdTakeOffTime = formatTimeObj(rawThirdTakeOffTime);
         if (!signTime || !flightLandingTime) {
             setIsError(true);
+            setErrorMsg('签到时间和全天航班计划落地时间不能为空');
             return;
         }
         let errorFlag = false;
+        let errorMsg = '';
         let currPlanWorkTime: number;
         if (!secondCloseTime && !secondTakeOffTime && !thirdCloseTime && !thirdTakeOffTime) {
             currPlanWorkTime = flightLandingTime?.valueOf() - signTime?.valueOf();
         } else if (secondCloseTime && secondTakeOffTime && !thirdCloseTime && !thirdTakeOffTime) {
-            currPlanWorkTime = flightLandingTime?.valueOf() - signTime?.valueOf() - secondTakeOffTime.valueOf() + secondCloseTime.valueOf() + 4500*1000;
+            if ((secondTakeOffTime.valueOf() - secondCloseTime.valueOf()) <= 3 * 3600 * 1000) {
+                errorFlag = true;
+                errorMsg = '二次进场预计起飞时刻和二次进场前关车时刻间隔不能小于 3 小时';
+            } else {
+                currPlanWorkTime = flightLandingTime?.valueOf() - signTime?.valueOf() - secondTakeOffTime.valueOf() + secondCloseTime.valueOf() + 4500*1000;
+            }
         } else if (secondCloseTime && secondTakeOffTime && thirdCloseTime && thirdTakeOffTime) {
-            currPlanWorkTime = flightLandingTime?.valueOf() - signTime?.valueOf() - secondTakeOffTime.valueOf() + secondCloseTime.valueOf() - thirdTakeOffTime.valueOf() + thirdCloseTime.valueOf() + 9000*1000;
+            if (secondTakeOffTime.valueOf() - secondCloseTime.valueOf() <= 3 * 3600 * 1000) {
+                errorFlag = true;
+                errorMsg = '二次进场预计起飞时刻和二次进场前关车时刻间隔不能小于 3 小时';
+            } else if (thirdTakeOffTime.valueOf() - thirdCloseTime.valueOf() <= 3 * 3600 * 1000) {
+                errorFlag = true;
+                errorMsg = '三次进场预计起飞时刻和三次进场前关车时刻间隔不能小于 3 小时';
+            } else {
+                currPlanWorkTime = flightLandingTime?.valueOf() - signTime?.valueOf() - secondTakeOffTime.valueOf() + secondCloseTime.valueOf() - thirdTakeOffTime.valueOf() + thirdCloseTime.valueOf() + 9000*1000;
+            }
         } else {
             errorFlag = true;
+            errorMsg = '输入不能为空';
         }
         if (errorFlag) {
             setIsError(true);
+            setErrorMsg(errorMsg);
             return;
         }
         let currLastWorkTime = moment();
@@ -182,7 +200,7 @@ const App: React.FC = () => {
             </Form.Item>
         </Form>
         <div className={styles.result}>
-            { isError ? <p>输入异常</p> : <p>您当前任务计划执勤时长为{planWorkTime}，最晚执勤至{lastWorkTime}</p> }
+            { isError ? <p>输入异常: {errorMsg}</p> : <p>您当前任务计划执勤时长为{planWorkTime}，最晚执勤至{lastWorkTime}</p> }
         </div>
         </div>
     );
